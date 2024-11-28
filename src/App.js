@@ -1,54 +1,74 @@
 import React, { useState } from "react";
 import FileUpload from "./FileUpload";
 import SalesChart from "./SalesChart";
-import { buildModel, trainModel, predictSales, normalizeData, denormalizeData } from "./modelUtils";
+import { buildModel, trainModel, predictSales } from "./modelUtils";
 import "./styles.css";
 
 const App = () => {
-  const [actualSales, setActualSales] = useState([]);
-  const [predictedSales, setPredictedSales] = useState([]);
+  const [productAActual, setProductAActual] = useState([]);
+  const [productBActual, setProductBActual] = useState([]);
+  const [productAPredicted, setProductAPredicted] = useState([]);
+  const [productBPredicted, setProductBPredicted] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState("A"); // Default is Product A
 
   const handleDataProcessed = async (data) => {
-    // Normalize the data
-    const quantityValues = data.map((d) => d.quantity_sold);
-    const minQuantity = Math.min(...quantityValues);
-    const maxQuantity = Math.max(...quantityValues);
+    // Separate data for Product A and Product B
+    const productAData = data.filter((d) => d.product_description === 0); // 0 corresponds to Product A
+    const productBData = data.filter((d) => d.product_description === 1); // 1 corresponds to Product B
 
-    // Prepare input and output tensors
-    const inputs = data.map((d) => [d.sales_date, d.product_description]); // Features: sales_date and product_description
-    const outputs = data.map((d) => normalizeData(d.quantity_sold, minQuantity, maxQuantity)); // Normalize quantity_sold
+    // Prepare inputs and outputs for each product
+    const inputsA = productAData.map((d) => [d.sales_date, d.product_description]);
+    const outputsA = productAData.map((d) => d.quantity_sold);
+    const inputsB = productBData.map((d) => [d.sales_date, d.product_description]);
+    const outputsB = productBData.map((d) => d.quantity_sold);
 
-    // Train the model
+    if (!inputsA.length || !inputsB.length || inputsA.length !== outputsA.length || inputsB.length !== outputsB.length) {
+      alert("Data is invalid. Ensure inputs and outputs are consistent.");
+      return;
+    }
+
+    // Build and train the model
     const model = buildModel();
-    await trainModel(model, inputs, outputs);
+    await trainModel(model, [...inputsA, ...inputsB], [...outputsA, ...outputsB]);
 
-    // Generate predictions for the next 6 months
-    const lastSalesDate = Math.max(...data.map((d) => d.sales_date));
-    const futureData = Array.from({ length: 6 }, (_, i) => [
-      lastSalesDate + i + 1, // Increment months
-      0, // Predict for Product A by default
-    ]);
-    const predictions = predictSales(model, futureData).map((pred) =>
-      denormalizeData(pred, minQuantity, maxQuantity)
-    );
+    // Predict sales for future data (for the next 6 months for each product)
+    const futureDataA = [
+      [13, 0], [14, 0], [15, 0], [16, 0], [17, 0], [18, 0],
+    ];
+    const futureDataB = [
+      [13, 1], [14, 1], [15, 1], [16, 1], [17, 1], [18, 1],
+    ];
 
-    // Format predictions for visualization
-    const predictedData = futureData.map((fd, idx) => ({
-      sales_date: `${Math.floor(fd[0] / 12)}-${String(fd[0] % 12 || 12).padStart(2, "0")}`, // Convert back to YYYY-MM
-      product_description: "Product A",
-      quantity_sold: predictions[idx],
-    }));
+    const predictionsA = predictSales(model, futureDataA);
+    const predictionsB = predictSales(model, futureDataB);
 
-    // Update state for chart display
-    setActualSales(data.map((d) => d.quantity_sold));
-    setPredictedSales(predictedData.map((d) => d.quantity_sold));
+    // Update state with actual and predicted sales for both products
+    setProductAActual(outputsA);
+    setProductBActual(outputsB);
+    setProductAPredicted(predictionsA);
+    setProductBPredicted(predictionsB);
+  };
+
+  const handleProductSelection = (product) => {
+    setSelectedProduct(product);
   };
 
   return (
     <div className="app">
       <h1>Sales Forecasting</h1>
       <FileUpload onDataProcessed={handleDataProcessed} />
-      <SalesChart actual={actualSales} predicted={predictedSales} />
+      
+      {/* Buttons to toggle between Product A and Product B */}
+      <div className="buttons">
+        <button onClick={() => handleProductSelection("A")}>Product A</button>
+        <button onClick={() => handleProductSelection("B")}>Product B</button>
+      </div>
+
+      {/* Conditionally render chart based on selected product */}
+      <SalesChart
+        actual={selectedProduct === "A" ? productAActual : productBActual}
+        predicted={selectedProduct === "A" ? productAPredicted : productBPredicted}
+      />
     </div>
   );
 };
