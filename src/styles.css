@@ -1,32 +1,12 @@
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f9;
-    margin: 0;
-    padding: 0;
-  }
-  
-  .app {
-    text-align: center;
-    padding: 20px;
-  }
-  
-  .file-upload {
-    margin: 20px;
-  }
-  
-  button {
-    margin-left: 10px;
-    padding: 5px 15px;
-    font-size: 16px;
-    cursor: pointer;
-  }
-  
-  h1 {
-    color: #333;
-  }
-  
-  canvas {
-    margin: 20px auto;
-    max-width: 90%;
-  }
-  
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+
+.file-upload {
+  margin-bottom: 20px;
+}
+
+.app {
+  padding: 20px;
+}

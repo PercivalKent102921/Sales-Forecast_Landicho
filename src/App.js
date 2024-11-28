@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import FileUpload from "./FileUpload";
 import SalesChart from "./SalesChart";
-import { buildModel, trainModel, predictSales } from "./modelUtils";
+import { buildModel, trainModel, predictSales, normalizeData, denormalizeData } from "./modelUtils";
 import "./styles.css";
 
 const App = () => {
@@ -9,33 +9,39 @@ const App = () => {
   const [predictedSales, setPredictedSales] = useState([]);
 
   const handleDataProcessed = async (data) => {
-    // Prepare inputs and outputs
-    const inputs = data.map((d) => [d.sales_date, d.product_description]); // 2D array
-    const outputs = data.map((d) => d.quantity_sold); // 1D array
+    // Normalize the data
+    const quantityValues = data.map((d) => d.quantity_sold);
+    const minQuantity = Math.min(...quantityValues);
+    const maxQuantity = Math.max(...quantityValues);
 
-    if (!inputs.length || !outputs.length || inputs.length !== outputs.length) {
-      alert("Data is invalid. Ensure inputs and outputs are consistent.");
-      return;
-    }
+    // Prepare input and output tensors
+    const inputs = data.map((d) => [d.sales_date, d.product_description]); // Features: sales_date and product_description
+    const outputs = data.map((d) => normalizeData(d.quantity_sold, minQuantity, maxQuantity)); // Normalize quantity_sold
 
-    // Build and train the model
+    // Train the model
     const model = buildModel();
     await trainModel(model, inputs, outputs);
 
-    // Predict sales for future data
-    const futureData = [
-      [13, 0],
-      [14, 0],
-      [15, 0],
-      [16, 0],
-      [17, 0],
-      [18, 0],
-    ];
-    const predictions = predictSales(model, futureData);
+    // Generate predictions for the next 6 months
+    const lastSalesDate = Math.max(...data.map((d) => d.sales_date));
+    const futureData = Array.from({ length: 6 }, (_, i) => [
+      lastSalesDate + i + 1, // Increment months
+      0, // Predict for Product A by default
+    ]);
+    const predictions = predictSales(model, futureData).map((pred) =>
+      denormalizeData(pred, minQuantity, maxQuantity)
+    );
 
-    // Update state with actual and predicted sales
-    setActualSales(outputs);
-    setPredictedSales(predictions);
+    // Format predictions for visualization
+    const predictedData = futureData.map((fd, idx) => ({
+      sales_date: `${Math.floor(fd[0] / 12)}-${String(fd[0] % 12 || 12).padStart(2, "0")}`, // Convert back to YYYY-MM
+      product_description: "Product A",
+      quantity_sold: predictions[idx],
+    }));
+
+    // Update state for chart display
+    setActualSales(data.map((d) => d.quantity_sold));
+    setPredictedSales(predictedData.map((d) => d.quantity_sold));
   };
 
   return (
